@@ -1,5 +1,7 @@
 # deeznetz
 
+![deeznetz](img.png)
+
 A lightweight network packet sniffer and ARP scanner written in Go, using
 [gopacket](https://github.com/google/gopacket). It captures live traffic,
 decodes DNS queries/responses and HTTP application payloads, saves captures
