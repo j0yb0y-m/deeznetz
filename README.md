@@ -17,6 +17,8 @@ active and passive modes (Netdiscover-style).
 - Graceful shutdown on `Ctrl+C`
 - **Active ARP scanning** of a CIDR range (sends ARP requests, collects replies)
 - **Passive ARP listening** (silently discovers hosts from ARP traffic)
+- **Port scanning** (lightweight TCP connect scan) of single hosts or whole CIDRs, with optional port lists/ranges and common-port defaults
+- **ARP + port scan integration** (scan discovered hosts for open ports right after ARP discovery)
 - MAC vendor (OUI) identification via the Wireshark `manuf` database
 
 ## Requirements
@@ -60,6 +62,53 @@ ARP subcommand flags:
 | `-i` | Network interface |
 | `-timeout` | Response timeout for active scans (default: 3s) |
 | `-delay` | Delay between ARP requests (default: 10ms) |
+| `-scan` | Port-scan all discovered hosts after the ARP phase |
+| `-scan-ports` | Ports to scan on discovered hosts (default: common ports) |
+| `-scan-timeout` | Port-scan connect timeout per port (default: 2s) |
+| `-scan-workers` | Concurrent port-scan connections (default: 100) |
+
+### Port scanner
+
+Scans a single host or a whole CIDR for open TCP ports using a lightweight
+connect scan (no root required). Ports may be a single value, a comma-separated
+list, or a range — or a combination — and default to a list of ~30 common
+ports when omitted.
+
+```sh
+# Scan a host with default common ports
+./deeznetz portscan 192.168.0.109
+
+# Scan a subnet, targeting HTTP(S) ports
+./deeznetz portscan 192.168.0.0/24 -p 80,443
+
+# Scan a port range with a custom timeout and concurrency
+./deeznetz portscan 10.0.0.5 -p 1-1000 -t 500ms -w 50
+
+# Flags may appear before or after the target
+./deeznetz portscan -p 22,80,443 192.168.0.1
+```
+
+Port scanner flags:
+
+| Flag | Description |
+|------|-------------|
+| `-p` | Ports to scan: single, list (`80,443`), or range (`1-1000`; default: common ports) |
+| `-t` | Connection timeout per port (default: 2s) |
+| `-w` | Number of concurrent connections (default: 100) |
+
+Example output:
+
+```
+$ ./deeznetz portscan 192.168.0.1 -p 22,80,443
+Scanning target(s) 192.168.0.1 (1 host(s)) on 3 port(s)...
+======================================
+
+192.168.0.1:
+  22/tcp    ssh
+  80/tcp    http
+
+Found 2 open port(s) on 1 host(s).
+```
 
 ### OUI database
 

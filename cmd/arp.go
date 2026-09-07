@@ -19,6 +19,10 @@ func RunARP(args []string) {
 	iface := fs.String("i", "", "Network interface (default: first non-loopback)")
 	timeout := fs.Duration("timeout", 3*time.Second, "Response timeout for active scan")
 	delay := fs.Duration("delay", 10*time.Millisecond, "Delay between ARP requests")
+	doPortScan := fs.Bool("scan", false, "Port-scan discovered hosts after the scan")
+	scanPorts := fs.String("scan-ports", "", "Ports to scan on discovered hosts (default: common ports)")
+	scanTimeout := fs.Duration("scan-timeout", 2*time.Second, "Connection timeout per port")
+	scanWorkers := fs.Int("scan-workers", 100, "Number of concurrent port connections")
 	fs.Parse(args)
 
 	if *rangeCIDR == "" && !*passive {
@@ -68,6 +72,41 @@ func RunARP(args []string) {
 	}
 
 	printResults(table)
+
+	if *doPortScan {
+		runDiscoveredPortScan(table, *scanPorts, *scanTimeout, *scanWorkers)
+	}
+}
+
+func runDiscoveredPortScan(table *scanner.HostTable, ports string, timeout time.Duration, workers int) {
+	hosts := table.GetAll()
+	if len(hosts) == 0 {
+		fmt.Println("\nNo hosts to port-scan.")
+		return
+	}
+
+	portList, err := scanner.ParsePorts(ports)
+	if err != nil {
+		log.Fatalf("Invalid port specification %q: %v", ports, err)
+	}
+
+	fmt.Printf("\nPort-scanning %d discovered host(s) on %d port(s)...\n",
+		len(hosts), len(portList))
+	fmt.Println("======================================")
+	fmt.Println()
+
+	totalOpen := 0
+	totalHosts := 0
+	for _, h := range hosts {
+		openPorts := scanner.ScanHost(h.IP, portList, timeout, workers)
+		if len(openPorts) == 0 {
+			continue
+		}
+		totalHosts++
+		totalOpen += printPortResults(h.IP, openPorts)
+	}
+
+	fmt.Printf("Found %d open port(s) on %d host(s).\n", totalOpen, totalHosts)
 }
 
 func runActiveScan(iface, cidr string, delay, timeout time.Duration, table *scanner.HostTable) {
